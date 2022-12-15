@@ -35,6 +35,7 @@ use sc_executor_common::{
 use sp_runtime_interface::unpack_ptr_and_len;
 use sp_wasm_interface::{HostFunctions, Pointer, Value, WordSize};
 use std::{
+	env,
 	path::{Path, PathBuf},
 	sync::{
 		atomic::{AtomicBool, Ordering},
@@ -365,6 +366,14 @@ fn common_config(semantics: &Semantics) -> std::result::Result<wasmtime::Config,
 			MAX_WASM_PAGES
 		};
 
+		let instances_max_default = 32;
+		let instances_max: u32 = match env::var_os("WASM_INSTANCES_LIMIT") {
+			Some(value) => value.into_string().unwrap().parse::<u32>().unwrap_or(instances_max_default),
+			None => instances_max_default
+		};
+
+		log::info!("number of concurrent WASM module instances limited to {}", instances_max);
+
 		config.allocation_strategy(wasmtime::InstanceAllocationStrategy::Pooling {
 			strategy: wasmtime::PoolingAllocationStrategy::ReuseAffinity,
 
@@ -385,7 +394,7 @@ fn common_config(semantics: &Semantics) -> std::result::Result<wasmtime::Config,
 
 				// This determines how many instances of the module can be
 				// instantiated in parallel from the same `Module`.
-				count: 32,
+				count: instances_max,
 			},
 		});
 	}
